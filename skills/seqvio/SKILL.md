@@ -194,6 +194,7 @@ Each scene usually wraps its own `WhiteboardScene`. Scene-local draw timings sta
 - **Verdict icons must be applied to every case that earns them.** If one data point gets a `check`, every point on that side of the threshold needs one; a point left bare reads as a different outcome. Re-check the icon set against the claim each time a data point is added.
 - **Always pass `--width` / `--height` matching the composition.** The CLI defaults to 1920x1080 and silently corner-pins a smaller scene.
 - **Never judge or deliver a `--preset preview` render of text.** It is pixelRatio 1 + JPEG; handwriting blurs to illegible. Use `--preset final` for anything a human reads.
+- **Always set `EDGE_TTS_VOICE` — it defaults to `zh-CN-YunxiNeural`.** An unset voice means a Mandarin narrator reads your English script, which sounds subtly wrong rather than obviously broken and survives review. See field-notes item 6.
 - **After synthesis, retime the visuals to the resolved cue spans** before the final render, and probe one frame near each scene's end to catch label/arrow collisions. See field-notes items 5 and 7.
 - For ExplainerDocument audio alignment, use `explanation.cues` and phrase-anchored `explanation.beats`; do not independently tune narration and visual timestamps.
 - For hand-authored TSX, prefer one narration cue per scene or beat and set `sceneId` on each cue.

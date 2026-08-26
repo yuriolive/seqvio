@@ -178,6 +178,30 @@ C:\Users\<user>\AppData\Roaming\Python\Python313\Scripts\edge-tts.exe
 export EDGE_TTS_BIN="/c/Users/<user>/AppData/Roaming/Python/Python313/Scripts/edge-tts.exe"
 ```
 
+### Always set the voice — the default is Chinese
+
+`EDGE_TTS_VOICE` defaults to **`zh-CN-YunxiNeural`**. Leave it unset and an
+English script is read by a Mandarin voice, which is intelligible enough that it
+can survive a whole review unnoticed while sounding subtly wrong.
+
+Set it explicitly for every render, matched to the script's language:
+
+```bash
+export EDGE_TTS_VOICE=en-US-AriaNeural      # English
+export EDGE_TTS_VOICE=pt-BR-FranciscaNeural # Portuguese (BR)
+export EDGE_TTS_VOICE=es-ES-ElviraNeural    # Spanish
+```
+
+`edge-tts --list-voices` enumerates them. Voices ending `MultilingualNeural`
+handle several languages with one voice, which keeps a narrator consistent across
+localised versions of the same video.
+
+Localising a whole explainer means re-synthesising **and** re-timing: a
+translation is rarely the same length as the original, so read the new resolved
+cue spans and rescale scene timings (item 5). On-screen labels are authored text
+and are not touched by the audio pipeline — translate them in the composition or
+the video ends up bilingual.
+
 ## 7. Probe frames before committing to a full render
 
 A `--preset final` render of ~3,500 frames takes ~5 minutes single-worker. Do not
