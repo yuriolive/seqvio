@@ -21,16 +21,6 @@ const PEN_TIP = { x: 28, y: 50 };
 const ROTATION_SMOOTH = 0.45;
 const IDLE_HOLD_FRAMES = 4;
 
-/**
- * Cap on how far the pen may travel in one frame, in scene px.
- *
- * Without it the pen teleports between drawables. A scene that draws many small
- * elements in sequence (a grid of dots, a row of icons) then reads as the pencil
- * flicking left and right rather than moving like a hand. Gliding instead keeps
- * the motion legible; the cap is high enough that following a genuinely fast
- * stroke does not visibly lag.
- */
-const MAX_TRAVEL_PER_FRAME = 55;
 
 export const Hand: React.FC<HandProps> = ({
   position = { x: 0, y: 0 },
@@ -60,8 +50,6 @@ export const Hand: React.FC<HandProps> = ({
   let penY = penState.current.y;
   let penRot = penState.current.rot;
   let hasActiveDraw = false;
-  // Captured before the active draw overwrites drawId below.
-  const hadPreviousPosition = penState.current.drawId !== null;
 
   if (follow && registry) {
     const activeDraw = registry.getActiveDrawAtFrame(frame);
@@ -131,20 +119,6 @@ export const Hand: React.FC<HandProps> = ({
   }
 
   if (hasActiveDraw) {
-    // Glide toward the stroke head rather than teleporting to it. `drawId` is
-    // null on the first frame this pen sees (including the first frame of a
-    // parallel render worker), where there is no previous position to glide
-    // from, so that frame snaps.
-    if (hadPreviousPosition) {
-      const dx = penX - penState.current.x;
-      const dy = penY - penState.current.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > MAX_TRAVEL_PER_FRAME) {
-        const k = MAX_TRAVEL_PER_FRAME / dist;
-        penX = penState.current.x + dx * k;
-        penY = penState.current.y + dy * k;
-      }
-    }
     penState.current.x = penX;
     penState.current.y = penY;
     penState.current.rot = penRot;

@@ -357,17 +357,25 @@ the axis top. Compute the extent rather than eyeballing it: **roughly
 `0.5 * fontSize * characters` px wide**, half of that either side of a centred
 anchor. Same check applies to any label near a threshold line or a bar.
 
-## 13. Many small sequential draws make the pen flick
+## 13. Many small sequential draws make the pen flick — fix the authoring
 
-A grid of dots or a row of icons drawn one after another used to make the pencil
+A grid of dots or a row of icons drawn one after another makes the pencil
 teleport between them: three hops right along a row, then a jump back left for
 the next row, which reads as flicking rather than as a hand moving.
 
-`Hand` now caps travel at `MAX_TRAVEL_PER_FRAME` (55 scene px) and glides toward
-the stroke head instead of snapping. The first frame a pen sees still snaps,
-since there is no previous position to glide from — that also covers the first
-frame of each parallel render worker.
+**Do not try to fix this in `Hand` by capping travel speed.** That was tried and
+reverted. Clamping travel makes the pen lag behind the point actually being
+drawn, so the stroke appears while the pencil floats somewhere else — visibly
+worse than the flicking it was meant to cure. The pen tip belongs exactly on the
+stroke head; that constraint is not negotiable, and any smoothing that breaks it
+is wrong however smooth the motion looks in isolation.
 
-The authoring half still matters: twenty circles at nine frames each is six
-seconds of pen travel. Keep incidental grids brief, and let the pen spend its
-time on the marks that carry meaning.
+It is an authoring problem. Twenty circles at nine frames each is six seconds of
+the scene spent hopping around a decorative grid.
+
+- Draw fewer marks. A representative grid of twelve reads the same as twenty.
+- Space the hops out rather than speeding them up. Fewer, slower jumps read
+  calmer than many rapid ones; shortening the stride makes it more frantic, not
+  less.
+- Spend the pen's time on marks that carry meaning, and let incidental texture be
+  brief.
