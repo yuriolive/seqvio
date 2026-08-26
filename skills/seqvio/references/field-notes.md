@@ -93,16 +93,38 @@ console.log('M count:', (d.match(/M/g)||[]).length)"
 
 Above ~10 means the bug is present.
 
+### The sketched interior is a feature — just not that way
+
+The crosshatch *look* is wanted: it matches the wobble of the outline and reads
+as hand-drawn. What was broken was routing it through the outline path. So it is
+now generated deliberately and kept separate.
+
+`fillColor` on a hand-drawn theme gives a roughjs `fillSketch` rendered as its
+own `<path>`, which `Hand` never follows:
+
+```tsx
+<DrawShape type="rectangle" strokeColor={BLUE} fillColor={BLUE} ... />   // hachure
+<DrawShape type="circle" fillColor={GREEN} fillStyle="cross-hatch" ... /> // denser
+<DrawShape type="rectangle" fillColor={RED} fillStyle="solid" ... />      // flat
+```
+
+`fillStyle` defaults to `'hachure'` and also accepts `'cross-hatch'`,
+`'zigzag'`, `'dots'`, `'dashed'`, and `'solid'`. Hachure-filled rectangles make
+good bar-chart bars and filled circles make good scatter points and graph nodes.
+
+The invariant to preserve: **outline geometry and interior geometry stay in
+separate paths.** Only the outline is registered with the draw registry. Any new
+fillable shape type must follow that split, or the pen starts jumping again.
+
 Still true regardless:
 
 - **Prefer labels outside the shape.** A filled shape behind text is a contrast
-  risk even when the fill is clean; put the label above or beside the shape, or
+  risk however clean the fill; put the label above or beside the shape, or
   colour the text itself.
-- **Fills need a backing element, not path fill.** A jittered outline is a set of
-  disconnected edge strokes, not one closed subpath, so `fill` painted on the
-  path renders nothing usable. `DrawShape` draws a plain `<circle>` / `<rect>`
-  behind the stroke for `circle` and rect types. Any new fillable shape type
-  needs the same treatment.
+- **Solid fills need a backing element, not path fill.** A jittered outline is a
+  set of disconnected edge strokes, not one closed subpath, so `fill` painted on
+  the path renders nothing usable. `DrawShape` draws a plain `<circle>` /
+  `<rect>` behind the stroke for `fillStyle="solid"`.
 - `rounded-rectangle` can still mis-jitter at some seeds, producing a stray
   curve. Prefer `rectangle` when a plain box is needed.
 
@@ -260,10 +282,15 @@ and only slide it along the stroke.
 Prefer that, in every scene:
 
 ```tsx
-<Hand action="write" follow visible rotate={false} rotation={-32} />
+<Hand action="write" follow visible rotate={false} rotation={148} />
 ```
 
-`rotate={false}` holds the angle given by `rotation` (negative tilts the pencil
-so it enters from the lower right, like a right-handed hand). Turn rotation back
-on only for a scene that is one long continuous curve, where facing the stroke
-genuinely helps.
+`rotate={false}` holds the angle given by `rotation`. The pen SVG has its tip at
+the bottom and its body above, and `transformOrigin` is the tip, so `rotation`
+swings the body around the contact point: `0` puts the body straight up, and
+**`148` gives the familiar right-handed look — tip contacting at the upper left,
+body angled away to the lower right.** Start from `148`; if the pencil appears to
+write with its eraser, you are 180 degrees out.
+
+Turn rotation back on only for a scene that is one long continuous curve, where
+facing the stroke genuinely helps.

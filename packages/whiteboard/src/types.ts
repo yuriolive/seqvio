@@ -40,6 +40,13 @@ export interface DrawOptions {
   strokeWidth?: number;
   fillColor?: string;
   fillDelay?: number;
+  /**
+   * How `fillColor` is applied on a hand-drawn theme. Defaults to `'hachure'`,
+   * the sketched interior that matches the drawn outline. `'solid'` paints a
+   * flat backing shape instead. Ignored when the theme is not hand-drawn, which
+   * always fills solid.
+   */
+  fillStyle?: 'hachure' | 'cross-hatch' | 'zigzag' | 'dots' | 'dashed' | 'solid';
   /** Stable id consumed by AnnotationProvider via data-annotation-target. */
   annotationId?: string;
 }

@@ -26,6 +26,30 @@ export interface RoughStyle {
   seed: number;
 }
 
+/** Sketchy interior fill: hachure and friends are drawn as strokes, not a fill. */
+export interface RoughFill {
+  color: string;
+  style?: 'hachure' | 'cross-hatch' | 'zigzag' | 'dots' | 'dashed' | 'zigzag-line';
+  /** Spacing between hachure lines in px. */
+  gap?: number;
+  /** Stroke width of the hachure lines. */
+  weight?: number;
+  /** Hachure angle in degrees. */
+  angle?: number;
+}
+
+/**
+ * Outline and interior sketch as two separate `d` strings.
+ *
+ * They must stay separate. The outline is what `Hand` follows, and mixing fill
+ * geometry into it makes the pen jump across the shape (see the fill: 'none'
+ * regression in git history). Callers render the interior as its own path.
+ */
+export interface RoughParts {
+  outline: string;
+  fill: string;
+}
+
 export function hashRoughSeed(key: string): number {
   let h = 2166136261;
   for (let i = 0; i < key.length; i++) {
@@ -55,6 +79,70 @@ function roughOptions(style: RoughStyle): Options {
     disableMultiStroke: true,
     preserveVertices: false,
   };
+}
+
+function fillOptions(fill: RoughFill | undefined): Options {
+  if (!fill) return {};
+  return {
+    fill: fill.color,
+    fillStyle: fill.style ?? 'hachure',
+    hachureGap: fill.gap ?? 5,
+    fillWeight: fill.weight ?? 1.4,
+    hachureAngle: fill.angle ?? -41,
+  };
+}
+
+/**
+ * Split a drawable into outline (`path` sets) and interior (`fillSketch` /
+ * `fillPath` sets), keeping each as its own `d`.
+ */
+function drawableToParts(
+  gen: RoughGenerator,
+  drawable: ReturnType<RoughGenerator['line']>
+): RoughParts {
+  const outline: string[] = [];
+  const fill: string[] = [];
+  for (const set of drawable.sets) {
+    const d = gen.opsToPath(set);
+    if (!d) continue;
+    if (set.type === 'path') outline.push(d);
+    else fill.push(d);
+  }
+  return { outline: outline.join(' '), fill: fill.join(' ') };
+}
+
+export function roughRectangleParts(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  style: RoughStyle,
+  fill?: RoughFill
+): RoughParts {
+  const gen = getGenerator();
+  return drawableToParts(
+    gen,
+    gen.rectangle(x, y, width, height, {
+      ...roughOptions(style),
+      ...fillOptions(fill),
+    })
+  );
+}
+
+export function roughCircleParts(
+  center: Point,
+  diameter: number,
+  style: RoughStyle,
+  fill?: RoughFill
+): RoughParts {
+  const gen = getGenerator();
+  return drawableToParts(
+    gen,
+    gen.circle(center.x, center.y, diameter, {
+      ...roughOptions(style),
+      ...fillOptions(fill),
+    })
+  );
 }
 
 function drawableToPathD(gen: RoughGenerator, drawable: ReturnType<RoughGenerator['line']>): string {

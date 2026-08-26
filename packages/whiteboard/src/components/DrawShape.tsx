@@ -23,8 +23,10 @@ import {
   hashRoughSeed,
   roughArrow,
   roughCircle,
+  roughCircleParts,
   roughLine,
   roughRectangle,
+  roughRectangleParts,
   roughRoundedRectangle,
   roughStarPath,
   roughUnderline,
@@ -66,6 +68,7 @@ const DrawShapeComponent: React.FC<DrawShapeProps> = ({
   strokeWidth: strokeWidthProp,
   fillColor: fillColorProp,
   fillDelay = 0.3,
+  fillStyle: fillStyleProp,
   roughness: roughnessProp,
   borderRadius: borderRadiusProp,
   annotationId,
@@ -268,27 +271,65 @@ const DrawShapeComponent: React.FC<DrawShapeProps> = ({
       : fillProgress
     : 0;
 
-  // For circles with fill: use a plain <circle> element for the fill background,
-  // because roughjs generates multiple sub-paths whose nonzero fill rule creates
-  // "holes" in the interior. The plain <circle> fills cleanly; roughjs only strokes.
+  // On a hand-drawn theme the interior is sketched, not flooded: roughjs draws
+  // hachure lines that match the wobble of the outline. They are emitted as a
+  // separate `fillSketch` set and rendered as their own path here, so the
+  // outline that Hand follows stays a clean set of edge strokes.
+  const sketchFillStyle = fillStyleProp ?? 'hachure';
+  const useSketchFill =
+    handDrawn &&
+    shouldFill &&
+    sketchFillStyle !== 'solid' &&
+    (type === 'rectangle' || type === 'circle');
+
+  const sketchFillPath = useMemo(() => {
+    if (!useSketchFill) return '';
+    const fill = {
+      color: resolvedFillColor,
+      style: sketchFillStyle as Exclude<typeof sketchFillStyle, 'solid'>,
+    };
+    if (type === 'circle') {
+      const diameter = typeof size === 'number' ? size : size.width;
+      return roughCircleParts(position, diameter, roughStyle, fill).fill;
+    }
+    const width = typeof size === 'number' ? size : size.width;
+    const height = typeof size === 'number' ? size : size.height;
+    return roughRectangleParts(
+      position.x,
+      position.y,
+      width,
+      height,
+      roughStyle,
+      fill
+    ).fill;
+  }, [
+    useSketchFill,
+    type,
+    position,
+    size,
+    roughStyle,
+    resolvedFillColor,
+    sketchFillStyle,
+  ]);
+
+  // Solid fills still need a backing element. A jittered outline is a set of
+  // disconnected edge strokes, not one closed subpath, so painting `fill` on the
+  // path itself renders nothing usable.
   const circleRadius =
-    type === 'circle' && shouldFill
+    type === 'circle' && shouldFill && !useSketchFill
       ? (typeof size === 'number' ? size : size.width) / 2
       : null;
 
-  // Rectangles need the same treatment, and for the same reason: the jittered
-  // outline is a set of disconnected edge strokes, not one closed subpath, so
-  // painting `fill` on it produces nothing usable. A plain <rect> behind the
-  // stroke fills cleanly while roughjs keeps drawing only the outline.
   const rectFill =
-    isRectType(type) && shouldFill
+    isRectType(type) && shouldFill && !useSketchFill
       ? {
           width: typeof size === 'number' ? size : size.width,
           height: typeof size === 'number' ? size : size.height,
         }
       : null;
 
-  const hasBackingFill = circleRadius !== null || rectFill !== null;
+  const hasBackingFill =
+    circleRadius !== null || rectFill !== null || useSketchFill;
 
   return (
       <svg
@@ -313,6 +354,16 @@ const DrawShapeComponent: React.FC<DrawShapeProps> = ({
           fill={resolvedFillColor}
           fillOpacity={fillOpacity}
           stroke="none"
+        />
+      )}
+      {sketchFillPath !== '' && (
+        <path
+          d={sketchFillPath}
+          stroke={resolvedFillColor}
+          strokeWidth={1.4}
+          strokeOpacity={fillOpacity}
+          fill="none"
+          strokeLinecap="round"
         />
       )}
       {rectFill !== null && (
