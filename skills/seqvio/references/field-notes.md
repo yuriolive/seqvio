@@ -330,3 +330,44 @@ write with its eraser, you are 180 degrees out.
 
 Turn rotation back on only for a scene that is one long continuous curve, where
 facing the stroke genuinely helps.
+
+## 11. Paint order is JSX order, not draw order
+
+Every drawable renders as its own absolutely positioned `<svg>`, so what paints
+on top is decided by **document order**, not by when it animates. An arrow
+authored after a label draws later *and* covers it.
+
+Two consequences when a connector and a label share space:
+
+- Author the label **after** the arrows and lines it sits among, so it paints on
+  top even though it was drawn first.
+- Better still, keep them apart. A connector crossing a label is untidy however
+  the z-order falls. Map the corridor your arrows occupy and place labels outside
+  it: a fan of arrows spanning y 196-486 leaves y < 190 and y > 490 free.
+
+## 12. Text has no rotation, so give axis labels room
+
+`DrawText` takes no rotation or angle, so there is no vertical axis label. A
+horizontal label centred beside an axis will cross it: `"booking-engine reach"`
+at 19px is about 180px wide, so centring it at x=176 spans 86-266 and runs
+straight through an axis at x=250.
+
+Either shorten the text and centre it clear of the axis line, or place it above
+the axis top. Compute the extent rather than eyeballing it: **roughly
+`0.5 * fontSize * characters` px wide**, half of that either side of a centred
+anchor. Same check applies to any label near a threshold line or a bar.
+
+## 13. Many small sequential draws make the pen flick
+
+A grid of dots or a row of icons drawn one after another used to make the pencil
+teleport between them: three hops right along a row, then a jump back left for
+the next row, which reads as flicking rather than as a hand moving.
+
+`Hand` now caps travel at `MAX_TRAVEL_PER_FRAME` (55 scene px) and glides toward
+the stroke head instead of snapping. The first frame a pen sees still snaps,
+since there is no previous position to glide from — that also covers the first
+frame of each parallel render worker.
+
+The authoring half still matters: twenty circles at nine frames each is six
+seconds of pen travel. Keep incidental grids brief, and let the pen spend its
+time on the marks that carry meaning.
