@@ -28,6 +28,7 @@ export const Hand: React.FC<HandProps> = ({
   follow = true,
   visible = true,
   rotation = 0,
+  rotate = true,
   size: sizeProp,
 }) => {
   const theme = useWhiteboardTheme();
@@ -89,14 +90,21 @@ export const Hand: React.FC<HandProps> = ({
           );
           penX = head.point.x;
           penY = head.point.y;
-          targetRot = head.angleDeg + 90;
+          // On a gap between sub-strokes there is no stroke direction, so keep
+          // the current angle rather than snapping to a meaningless one.
+          targetRot = head.penUp
+            ? penState.current.rot
+            : head.angleDeg + 90;
         }
       }
 
       if (hasActiveDraw) {
         const drawChanged = penState.current.drawId !== activeDraw.id;
         penState.current.drawId = activeDraw.id;
-        if (drawChanged) {
+        if (!rotate) {
+          // Fixed-angle pen: travel along the stroke, never turn.
+          penRot = rotation;
+        } else if (drawChanged) {
           penRot = targetRot;
         } else {
           penRot = lerpAngleDegrees(

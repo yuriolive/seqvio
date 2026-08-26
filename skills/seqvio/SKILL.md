@@ -113,6 +113,13 @@ The skill alone does not install npm packages or render MP4 output.
 
 ## Read This First
 
+**Mandatory before authoring any composition — not optional, not "if time permits":**
+
+1. Read [references/field-notes.md](references/field-notes.md). It contains the failure modes that actually happen on a first run (broken npm install, unreadable output, text-only visuals, narration/visual length mismatch). Skipping it reproduces them.
+2. Read the "Diagram richness", "Scene-level visual metaphors", and "Expressive blackboard motion" sections of [references/production-techniques.md](references/production-techniques.md) **before** writing the first `DrawText`. A composition authored without them defaults to centered text lines, which is the single most common bad output this framework produces.
+
+Then, as needed:
+
 - For overall scope and repo layout, read [references/current-capabilities.md](references/current-capabilities.md).
 - For file contracts and code patterns, read [references/authoring-patterns.md](references/authoring-patterns.md).
 - For build and render commands, read [references/render-workflow.md](references/render-workflow.md).
@@ -175,6 +182,15 @@ Each scene usually wraps its own `WhiteboardScene`. Scene-local draw timings sta
   - a default React component
   - `meta` with at least `duration` and `fps`
 - All timing is in **frames**, not seconds.
+- **A composition of centered text lines is a defect, not a style.** Every scene needs a diagram form — axis and data marks, a fan-out, a threshold plot, a converging junction — with text as labels on it. See [references/field-notes.md](references/field-notes.md) item 8 for the forms that are buildable from the seven available shape types, and item 9 for the self-check. Never reuse the same layout across two scenes.
+- **Prefer labels beside or above a `DrawShape`, not inside it.** A fill behind text is a contrast risk.
+- **`fillColor` gives a sketched hachure interior on hand-drawn themes**, drawn as its own path so the pen never follows it; `fillStyle` accepts `cross-hatch`, `zigzag`, `dots`, `dashed`, or `solid`. Keep outline and interior geometry in separate paths — merging them is what made the pen jump. See [references/field-notes.md](references/field-notes.md) item 4.
+- **If the following pen spins or skates, measure the path geometry before touching `Hand`.** Sub-path gaps in hand-drawn paths, not the pen code, are the usual cause. See field-notes item 10.
+- **Give every scene a non-turning pen:** `<Hand action="write" follow visible rotate={false} rotation={148} />`. A pen that faces the stroke direction pivots at every corner and sub-stroke and pulls attention off the drawing. `148` is the right-handed angle: tip at the upper left, body away to the lower right.
+- **Verdict icons must be applied to every case that earns them.** If one data point gets a `check`, every point on that side of the threshold needs one; a point left bare reads as a different outcome. Re-check the icon set against the claim each time a data point is added.
+- **Always pass `--width` / `--height` matching the composition.** The CLI defaults to 1920x1080 and silently corner-pins a smaller scene.
+- **Never judge or deliver a `--preset preview` render of text.** It is pixelRatio 1 + JPEG; handwriting blurs to illegible. Use `--preset final` for anything a human reads.
+- **After synthesis, retime the visuals to the resolved cue spans** before the final render, and probe one frame near each scene's end to catch label/arrow collisions. See field-notes items 5 and 7.
 - For ExplainerDocument audio alignment, use `explanation.cues` and phrase-anchored `explanation.beats`; do not independently tune narration and visual timestamps.
 - For hand-authored TSX, prefer one narration cue per scene or beat and set `sceneId` on each cue.
 - For narrated videos, **voice is the clock**: do not pad scenes with silence to hit a target duration. If the video must be longer, expand the script and synthesize more narration.

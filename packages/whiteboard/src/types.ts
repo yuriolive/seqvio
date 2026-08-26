@@ -40,6 +40,13 @@ export interface DrawOptions {
   strokeWidth?: number;
   fillColor?: string;
   fillDelay?: number;
+  /**
+   * How `fillColor` is applied on a hand-drawn theme. Defaults to `'hachure'`,
+   * the sketched interior that matches the drawn outline. `'solid'` paints a
+   * flat backing shape instead. Ignored when the theme is not hand-drawn, which
+   * always fills solid.
+   */
+  fillStyle?: 'hachure' | 'cross-hatch' | 'zigzag' | 'dots' | 'dashed' | 'solid';
   /** Stable id consumed by AnnotationProvider via data-annotation-target. */
   annotationId?: string;
 }
@@ -70,6 +77,15 @@ export interface HandProps {
   follow?: boolean;
   visible?: boolean;
   rotation?: number;
+  /**
+   * Whether the pen turns to face the stroke direction. Default `true`.
+   *
+   * Set `false` for the steadier look used by most hand-drawn explainer video
+   * styles: the pen keeps the fixed angle given by `rotation` and only travels
+   * along the stroke head. Turning is what makes the pen read as restless on
+   * shapes, whose outlines change direction at every corner and sub-stroke.
+   */
+  rotate?: boolean;
   /** Override theme pen tip size in CSS pixels. */
   size?: number;
 }
