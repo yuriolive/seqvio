@@ -89,7 +89,11 @@ export const Hand: React.FC<HandProps> = ({
           );
           penX = head.point.x;
           penY = head.point.y;
-          targetRot = head.angleDeg + 90;
+          // On a gap between sub-strokes there is no stroke direction, so keep
+          // the current angle rather than snapping to a meaningless one.
+          targetRot = head.penUp
+            ? penState.current.rot
+            : head.angleDeg + 90;
         }
       }
 

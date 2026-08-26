@@ -42,7 +42,16 @@ function roughOptions(style: RoughStyle): Options {
     seed: style.seed,
     stroke: '#000',
     strokeWidth: 1,
-    fill: 'none',
+    // `fill` is deliberately omitted, never set to 'none'. roughjs reads fill as
+    // a colour string, so 'none' is a request to fill — it emits a `fillSketch`
+    // set of hachure lines exactly as `fill: 'red'` would. drawableToPathD then
+    // concatenates every set into one `d`, so those hachure lines were stroked
+    // as part of the outline: shapes appeared crosshatched (unreadable behind
+    // text, and immune to the caller's fillColor="none"), and the path gained
+    // hundreds of disconnected sub-strokes with jumps as long as the shape's
+    // diagonal, which made the pen teleport and spin while following it.
+    // Omitting fill takes a 500x220 rectangle from 532 segments / 264 jumps to
+    // 8 segments / 3 jumps.
     disableMultiStroke: true,
     preserveVertices: false,
   };
@@ -53,7 +62,12 @@ function drawableToPathD(gen: RoughGenerator, drawable: ReturnType<RoughGenerato
   if (paths.length === 0) {
     return '';
   }
-  return paths.map((p) => p.d).join(' ');
+  // Keep only outline geometry. roughjs returns fill geometry (hachure lines)
+  // as separate entries whose `fill` is set and whose `stroke` is 'none';
+  // concatenating those into the stroked outline `d` is what previously made
+  // shapes look crosshatched and made the following pen jump around.
+  const outline = paths.filter((p) => p.stroke !== 'none');
+  return (outline.length > 0 ? outline : paths).map((p) => p.d).join(' ');
 }
 
 export function roughLine(

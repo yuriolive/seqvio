@@ -183,7 +183,8 @@ Each scene usually wraps its own `WhiteboardScene`. Scene-local draw timings sta
   - `meta` with at least `duration` and `fps`
 - All timing is in **frames**, not seconds.
 - **A composition of centered text lines is a defect, not a style.** Every scene needs a diagram form — axis and data marks, a fan-out, a threshold plot, a converging junction — with text as labels on it. See [references/field-notes.md](references/field-notes.md) item 8 for the forms that are buildable from the seven available shape types, and item 9 for the self-check. Never reuse the same layout across two scenes.
-- **Never place `DrawText` inside a themed `DrawShape`.** Under `excalidrawTheme` the shape gets a dense hachure fill even with `fillColor="none"` and the text becomes unreadable. Label outside the shape edge, or color the text itself.
+- **Prefer labels beside or above a `DrawShape`, not inside it.** A fill behind text is a contrast risk. (The old crosshatch that ignored `fillColor="none"` was a `roughOptions` bug and is fixed — see [references/field-notes.md](references/field-notes.md) item 4.)
+- **If the following pen spins or skates, measure the path geometry before touching `Hand`.** Sub-path gaps in hand-drawn paths, not the pen code, are the usual cause. See field-notes item 10.
 - **Always pass `--width` / `--height` matching the composition.** The CLI defaults to 1920x1080 and silently corner-pins a smaller scene.
 - **Never judge or deliver a `--preset preview` render of text.** It is pixelRatio 1 + JPEG; handwriting blurs to illegible. Use `--preset final` for anything a human reads.
 - **After synthesis, retime the visuals to the resolved cue spans** before the final render, and probe one frame near each scene's end to catch label/arrow collisions. See field-notes items 5 and 7.

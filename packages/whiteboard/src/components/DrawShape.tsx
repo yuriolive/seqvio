@@ -276,6 +276,20 @@ const DrawShapeComponent: React.FC<DrawShapeProps> = ({
       ? (typeof size === 'number' ? size : size.width) / 2
       : null;
 
+  // Rectangles need the same treatment, and for the same reason: the jittered
+  // outline is a set of disconnected edge strokes, not one closed subpath, so
+  // painting `fill` on it produces nothing usable. A plain <rect> behind the
+  // stroke fills cleanly while roughjs keeps drawing only the outline.
+  const rectFill =
+    isRectType(type) && shouldFill
+      ? {
+          width: typeof size === 'number' ? size : size.width,
+          height: typeof size === 'number' ? size : size.height,
+        }
+      : null;
+
+  const hasBackingFill = circleRadius !== null || rectFill !== null;
+
   return (
       <svg
         className="seqvio-drawable"
@@ -301,13 +315,25 @@ const DrawShapeComponent: React.FC<DrawShapeProps> = ({
           stroke="none"
         />
       )}
+      {rectFill !== null && (
+        <rect
+          x={position.x}
+          y={position.y}
+          width={rectFill.width}
+          height={rectFill.height}
+          rx={borderRadius || undefined}
+          fill={resolvedFillColor}
+          fillOpacity={fillOpacity}
+          stroke="none"
+        />
+      )}
       <path
         ref={pathRef}
         d={path}
         stroke={strokeColor}
         strokeWidth={strokeWidth}
-        fill={circleRadius !== null ? 'none' : (shouldFill ? resolvedFillColor : 'none')}
-        fillOpacity={circleRadius !== null ? 0 : fillOpacity}
+        fill={hasBackingFill ? 'none' : (shouldFill ? resolvedFillColor : 'none')}
+        fillOpacity={hasBackingFill ? 0 : fillOpacity}
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeDasharray={effectivePathLength || undefined}

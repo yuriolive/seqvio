@@ -17,14 +17,43 @@ export function resolvePathLength(
  * Point and tangent angle at the visible stroke head for dashoffset animation.
  * Offsets slightly along the tangent so the nib meets the round line cap.
  */
+/**
+ * Number of sample steps taken to each side of the head when averaging the
+ * tangent. Small enough to stay inside a short sub-stroke, large enough to
+ * smooth out roughjs jitter.
+ */
+const TANGENT_SAMPLE_STEPS = 4;
+
+/**
+ * A step longer than `delta * JUMP_STEP_RATIO` cannot be real stroke travel at
+ * this sampling density, so it is treated as a pen-up move between sub-paths.
+ */
+const JUMP_STEP_RATIO = 3;
+
+/**
+ * Point and tangent angle at the visible stroke head for dashoffset animation.
+ * Offsets slightly along the tangent so the nib meets the round line cap.
+ *
+ * A hand-drawn path is not one continuous stroke. roughjs emits a single `d`
+ * containing many disconnected sub-paths (a jittered rectangle has eight `M`
+ * commands, because every edge is drawn twice), and `getPointAtLength` walks
+ * straight through those gaps as if they were stroke. Sampling a tangent across
+ * such a gap yields the direction of the jump rather than of the stroke, which
+ * made the pen spin and skate across the shape.
+ *
+ * So the tangent is averaged only over the contiguous run of samples that
+ * contains the head: walking outward stops at the first gap. When the head sits
+ * on a gap there is no meaningful direction, and `penUp` is returned so callers
+ * can hold the previous angle instead of snapping to a bogus one.
+ */
 export function getStrokeHeadOnPath(
   pathElement: SVGPathElement,
   progress: number,
   strokeWidth = 2
-): { point: Point; angleDeg: number } {
+): { point: Point; angleDeg: number; penUp: boolean } {
   const length = pathElement.getTotalLength();
   if (length <= 0) {
-    return { point: { x: 0, y: 0 }, angleDeg: 0 };
+    return { point: { x: 0, y: 0 }, angleDeg: 0, penUp: true };
   }
 
   const t = Math.max(0, Math.min(1, progress));
@@ -32,17 +61,61 @@ export function getStrokeHeadOnPath(
   const point = pathElement.getPointAtLength(headDist);
 
   const delta = Math.max(0.5, length * 0.008);
-  const pBefore = pathElement.getPointAtLength(Math.max(0, headDist - delta));
-  const pAfter = pathElement.getPointAtLength(Math.min(length, headDist + delta));
-  const angleRad = Math.atan2(pAfter.y - pBefore.y, pAfter.x - pBefore.x);
+  const maxStep = delta * JUMP_STEP_RATIO;
 
+  const at = (d: number) =>
+    pathElement.getPointAtLength(Math.max(0, Math.min(length, d)));
+
+  // One sampling step, or null when it crosses a sub-path gap (or is degenerate).
+  const step = (from: number, to: number): { dx: number; dy: number } | null => {
+    if (to <= 0 || from >= length || Math.abs(to - from) < 1e-6) return null;
+    const a = at(from);
+    const b = at(to);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-6 || d > maxStep) return null;
+    return { dx: dx / d, dy: dy / d };
+  };
+
+  let sumX = 0;
+  let sumY = 0;
+  let used = 0;
+
+  // Walk forward from the head, stopping at the first gap.
+  for (let i = 0; i < TANGENT_SAMPLE_STEPS; i++) {
+    const s = step(headDist + i * delta, headDist + (i + 1) * delta);
+    if (!s) break;
+    sumX += s.dx;
+    sumY += s.dy;
+    used++;
+  }
+
+  // Walk backward from the head, stopping at the first gap.
+  for (let i = 0; i < TANGENT_SAMPLE_STEPS; i++) {
+    const s = step(headDist - (i + 1) * delta, headDist - i * delta);
+    if (!s) break;
+    sumX += s.dx;
+    sumY += s.dy;
+    used++;
+  }
+
+  const magnitude = Math.hypot(sumX, sumY);
+  if (used === 0 || magnitude < 1e-6) {
+    // Head is sitting on a gap between sub-strokes: no direction to report.
+    return { point: { x: point.x, y: point.y }, angleDeg: 0, penUp: true };
+  }
+
+  const angleRad = Math.atan2(sumY / magnitude, sumX / magnitude);
   const capOffset = Math.min(strokeWidth * 0.35, delta * 2);
-  const tipX = point.x + Math.cos(angleRad) * capOffset;
-  const tipY = point.y + Math.sin(angleRad) * capOffset;
 
   return {
-    point: { x: tipX, y: tipY },
+    point: {
+      x: point.x + Math.cos(angleRad) * capOffset,
+      y: point.y + Math.sin(angleRad) * capOffset,
+    },
     angleDeg: (angleRad * 180) / Math.PI,
+    penUp: false,
   };
 }
 

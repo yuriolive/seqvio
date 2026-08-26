@@ -60,22 +60,51 @@ useless for judging or delivering a text-bearing frame.
 Do not send a `preview` render for review and expect meaningful feedback about
 content.
 
-## 4. Under `excalidrawTheme`, never put text inside a shape
+## 4. The "hachure fill" was a bug in `roughOptions`, now fixed
 
-`DrawShape` `rectangle` / `rounded-rectangle` / `circle` receive a dense roughjs
-**hachure fill** even with `fillColor="none"`. The existing docs call this
-"faint" — it is not. It is high-contrast diagonal crosshatch that renders text
-placed inside the shape unreadable.
+Hand-drawn shapes used to render as dense diagonal crosshatch that ignored
+`fillColor="none"`, made text inside a shape unreadable, and sent the following
+pen skating across the frame. It was never a theme behaviour or a roughjs quirk
+to work around — it was one line:
 
-Consequences for authoring:
+```ts
+// packages/whiteboard/src/utils/roughPath.ts
+fill: 'none',   // roughjs reads fill as a COLOUR; 'none' means "please fill"
+```
 
-- **Never** place `DrawText` inside a themed `DrawShape` as a "box with a label".
-  Color the text itself, or attach the label outside the shape edge.
-- The fill is an **asset** for data marks: hachure-filled `rectangle`s make
-  excellent hand-drawn **bar chart bars**, and filled small `circle`s make good
-  scatter points and graph nodes. Use it deliberately there.
-- `rounded-rectangle` additionally mis-jitters at some seeds, producing a long
-  stray curve across the frame. Prefer `rectangle` when a box is needed.
+roughjs emitted a `fillSketch` set of hachure lines, identical to what
+`fill: 'red'` produces, and `drawableToPathD` concatenated every set — fill
+sketch included — into the single `d` that gets stroked. So the crosshatch was
+fill geometry being drawn as outline. For a 500x220 rectangle:
+
+| options | path segments | positional jumps |
+| --- | --- | --- |
+| `fill: 'none'` | 532 | 264 (up to 546px, the shape diagonal) |
+| `fill` omitted | 8 | 3 |
+
+The fix omits `fill` and filters non-stroke sets out of `drawableToPathD`.
+If you are on a build that predates it, verify with:
+
+```bash
+node -e "const g=require('roughjs/bundled/rough.cjs.js').generator();
+const d=g.toPaths(g.rectangle(0,0,500,220,{seed:42,fill:'none'})).map(p=>p.d).join(' ');
+console.log('M count:', (d.match(/M/g)||[]).length)"
+```
+
+Above ~10 means the bug is present.
+
+Still true regardless:
+
+- **Prefer labels outside the shape.** A filled shape behind text is a contrast
+  risk even when the fill is clean; put the label above or beside the shape, or
+  colour the text itself.
+- **Fills need a backing element, not path fill.** A jittered outline is a set of
+  disconnected edge strokes, not one closed subpath, so `fill` painted on the
+  path renders nothing usable. `DrawShape` draws a plain `<circle>` / `<rect>`
+  behind the stroke for `circle` and rect types. Any new fillable shape type
+  needs the same treatment.
+- `rounded-rectangle` can still mis-jitter at some seeds, producing a stray
+  curve. Prefer `rectangle` when a plain box is needed.
 
 ## 5. Narration length drives total duration — retime the visuals to match
 
@@ -193,3 +222,29 @@ by element count, and has no axis, no data marks, and no arrows connecting
 things, it is a text deck. Redesign it against the forms in item 8 and the
 "Scene-level visual metaphors" section of `production-techniques.md` — one
 distinct metaphor per scene, never the same layout twice.
+
+## 10. If the pen spins or skates, suspect path geometry, not the Hand
+
+`Hand` places the pencil at the stroke head by sampling `getPointAtLength` and a
+tangent on the registered path. A hand-drawn path is not one continuous stroke:
+roughjs draws each edge as its own sub-stroke, so even a clean rectangle outline
+has a few genuine pen-up gaps, and a buggy one had hundreds (item 4).
+`getPointAtLength` walks straight through those gaps as though they were stroke.
+
+Two consequences, both fixed in `getStrokeHeadOnPath`:
+
+- A tangent sampled across a gap reports the direction of the *jump*, not of the
+  stroke, so the pencil snapped to a meaningless angle and back every few frames.
+  The tangent is now averaged over only the contiguous run of samples containing
+  the head; walking outward stops at the first gap.
+- When the head sits exactly on a gap there is no direction at all. The function
+  returns `penUp: true` and `Hand` holds its previous angle instead of snapping.
+
+When the pen still looks wrong, measure the geometry before touching `Hand`:
+count `M` commands and real positional jumps in the generated `d`. A shape whose
+outline has more than a handful of jumps is a geometry bug upstream.
+
+`Hand` keeps rotation in a `useRef` across frames, which is safe under
+`--workers N` only because a fresh worker sees `drawId === null`, treats the
+frame as a draw change, and snaps straight to the true angle rather than lerping
+up from zero. Preserve that branch if you refactor the smoothing.
