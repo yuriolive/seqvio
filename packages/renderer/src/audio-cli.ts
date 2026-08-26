@@ -22,6 +22,13 @@ import {
   resolveSynthesizedCueTiming,
   validateAudioManifest,
 } from './audio/manifest';
+import { resolveLanguage } from './audio/language';
+import {
+  DEFAULT_MAX_SUBTITLE_CHARS,
+  segmentSubtitleCues,
+  toSrt,
+  toVtt,
+} from './audio/subtitles';
 
 type CommandName = 'extract' | 'validate' | 'synthesize';
 type TtsProvider = 'elevenlabs' | 'minimax' | 'edge-tts' | 'openai';
@@ -64,9 +71,15 @@ synthesize options:
   --outDir <path>      Output directory for generated MP3 files (required)
   --outManifest <path> Output manifest path (default: <outDir>/audio-manifest.resolved.json)
   --provider <name>    elevenlabs | minimax | edge-tts | openai (default: elevenlabs)
+  --lang <tag>         Narration language, e.g. pt-BR, es-ES, en-US. Picks a
+                       default voice for the provider and tags the subtitles.
+                       --voice still overrides it.
   --voice <name>       Provider-specific voice ID/name
   --model <name>       Provider-specific model override
   --baseUrl <url>      Override ElevenLabs/OpenAI base URL
+  --maxSubtitleChars <n>
+                       Longest subtitle segment in characters (default: 84)
+  --noSubtitleFiles    Skip writing captions.srt / captions.vtt
 `);
 }
 
@@ -422,6 +435,12 @@ async function runSynthesize(args: Map<string, string | boolean>): Promise<void>
   const provider = resolveProvider(
     String(args.get('provider') ?? process.env.SEQVIO_TTS_PROVIDER ?? 'elevenlabs')
   );
+  // --lang names the language and lets the provider's voice follow from it, so a
+  // caller does not have to know voice ids. Without it, edge-tts would read any
+  // script with a Mandarin voice, which sounds subtly wrong rather than broken.
+  const langInput = args.get('lang') ?? process.env.SEQVIO_LANG;
+  const language = langInput ? resolveLanguage(String(langInput)) : null;
+
   const voice = String(
     args.get('voice') ??
       (provider === 'elevenlabs'
@@ -429,8 +448,10 @@ async function runSynthesize(args: Map<string, string | boolean>): Promise<void>
         : provider === 'minimax'
           ? process.env.MINIMAX_TTS_VOICE ?? ''
           : provider === 'edge-tts'
-            ? process.env.EDGE_TTS_VOICE ?? 'zh-CN-YunxiNeural'
-            : process.env.OPENAI_TTS_VOICE ?? 'alloy')
+            ? language?.edgeTts ??
+              process.env.EDGE_TTS_VOICE ??
+              'zh-CN-YunxiNeural'
+            : language?.openai ?? process.env.OPENAI_TTS_VOICE ?? 'alloy')
   );
   const model = String(
     args.get('model') ??
@@ -588,12 +609,20 @@ async function runSynthesize(args: Map<string, string | boolean>): Promise<void>
           endMs: cue.endMs ?? cue.startMs ?? 0,
         }));
 
+  // A narration cue is a whole paragraph. Left whole it is unreadable on screen
+  // and unusable as a subtitle, so split it into sentence-shaped segments timed
+  // within the cue's own resolved window.
+  const maxSubtitleChars = Number(
+    args.get('maxSubtitleChars') ?? DEFAULT_MAX_SUBTITLE_CHARS
+  );
+  const subtitleCues = segmentSubtitleCues(resolvedCaptions, maxSubtitleChars);
+
   const resolvedManifest: CompositionAudioManifest = {
     ...manifest,
     lockToAudio: manifest.lockToAudio ?? true,
     narration: resolvedNarration,
     tracks: [...(manifest.tracks ?? []), ...resolvedTracks],
-    captions: resolvedCaptions,
+    captions: subtitleCues,
     sceneTimings: reflowedTimeline.sceneTimings,
     explanationBeats: reflowedTimeline.explanationBeats,
     duration:
@@ -607,6 +636,17 @@ async function runSynthesize(args: Map<string, string | boolean>): Promise<void>
 
   fs.mkdirSync(path.dirname(outManifestPath), { recursive: true });
   fs.writeFileSync(outManifestPath, `${JSON.stringify(resolvedManifest, null, 2)}\n`, 'utf8');
+
+  // Sidecar subtitles, for platforms that take an upload rather than burnt-in text.
+  if (!args.get('noSubtitleFiles') && subtitleCues.length > 0) {
+    const srtPath = path.join(outDir, 'captions.srt');
+    const vttPath = path.join(outDir, 'captions.vtt');
+    fs.writeFileSync(srtPath, toSrt(subtitleCues), 'utf8');
+    fs.writeFileSync(vttPath, toVtt(subtitleCues, language?.tag), 'utf8');
+    console.log(
+      `Wrote ${subtitleCues.length} subtitle cues to ${srtPath} and ${vttPath}`
+    );
+  }
   console.log(`Wrote resolved manifest to ${outManifestPath}`);
 }
 

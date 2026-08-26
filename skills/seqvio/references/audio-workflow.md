@@ -68,6 +68,41 @@ The output directory contains:
 - synthesized audio files
 - `audio-manifest.resolved.json` with actual cue timings
 
+## Language selection
+
+Pass `--lang` and the voice follows from it. Do not leave the voice unset:
+`EDGE_TTS_VOICE` defaults to `zh-CN-YunxiNeural`, so an English script comes out
+read by a Mandarin voice, which sounds subtly wrong rather than obviously broken
+and survives review.
+
+```bash
+node packages/renderer/dist/audio-cli.js synthesize   --provider edge-tts --lang pt-BR   --manifest output/x.manifest.json --outDir output/x-audio
+```
+
+Known tags: `en-US`, `en-GB`, `pt-BR`, `pt-PT`, `es-ES`, `es-MX`, `fr-FR`,
+`de-DE`, `it-IT`, `nl-NL`, `ja-JP`, `ko-KR`, `zh-CN`, `zh-TW`, `hi-IN`, `ar-SA`,
+`ru-RU`. Bare subtags (`pt`, `es`) resolve to the regional default. `--voice`
+overrides `--lang`; `edge-tts --list-voices` is the full catalogue, and voices
+ending `MultilingualNeural` keep one narrator across localised cuts.
+
+### Localising a whole explainer
+
+Translating the narration is the smaller half of the job:
+
+1. **Re-time.** A translation is rarely the same length. Re-run extract and
+   synthesize, read the new per-cue frame spans, and rescale every scene and
+   child timing (see the retime step in `field-notes.md` item 5). Our pt-BR cut
+   came out 192 frames shorter than the English one.
+2. **Translate the on-screen text.** Labels are authored in the composition and
+   the audio pipeline never touches them. Skip this and the video is bilingual:
+   Portuguese narration over English labels.
+3. **Localise formats too.** Thousands separators (`78,804` to `78.804`), decimal
+   commas, and month abbreviations (`Aug 18` to `18 ago`) are part of the
+   translation, not incidental.
+4. **Check accents render.** The hand-drawn fonts do carry Latin accents, but
+   verify a frame rather than assuming: a missing glyph shows as a box or a
+   silently dropped mark.
+
 ## Provider selection
 
 Default provider: `elevenlabs`
@@ -113,9 +148,30 @@ Important flags:
 
 Do **not** add `--burnCaptions` unless you explicitly want hard-coded subtitles in the video frames. Voiceover is already muxed from the manifest; burned captions are a separate visual overlay.
 
-## Caption burn-in (optional)
+## Subtitles (on by default)
 
-`--burnCaptions` bakes caption cues into every frame as a bottom overlay (black bar + white text). It is **optional** and often the wrong default.
+`synthesize` segments narration into short, sentence-shaped subtitle cues and
+writes them three ways:
+
+- into `captions` in the resolved manifest, which the renderer burns in
+- `captions.srt` and `captions.vtt` sidecars next to the audio, for platforms
+  that take a subtitle upload
+
+Segmentation matters: a narration cue is a whole spoken paragraph, and showing
+one as a single caption covers a third of the frame. Cues are split at sentence
+then clause boundaries to a default 84-character maximum, with each segment timed
+proportionally inside the cue's own resolved window. Tune with
+`--maxSubtitleChars`, or pass `--noSubtitleFiles` to skip the sidecars.
+
+`seqvio-render` burns subtitles **by default** whenever caption cues exist. Pass
+`--noBurnCaptions` for a clean image plus sidecar subtitles instead — the right
+choice for YouTube or Bilibili, where the platform renders uploaded subtitles and
+burnt-in text cannot be turned off or translated.
+
+## Caption burn-in details
+
+The overlay is a bottom-centred pill sized for one segmented line, not a
+paragraph.
 
 **Use `--burnCaptions` only when all of these apply:**
 

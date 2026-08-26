@@ -57,9 +57,12 @@ Options:
   --audioTrack <p>      Path to an audio file to mux as narration
   --mixMusic <p>        Path to a music file to mix under narration
   --captions <p>        Path to captions JSON for burn-in rendering
-  --burnCaptions         Optional: bake caption cues into frames (hard subtitles).
-                         Default: off. Do not use for full narration text or
-                         whiteboard content in the lower third.
+  --burnCaptions         Bake caption cues into frames (hard subtitles). ON by
+                         default whenever caption cues are available, since
+                         synthesis now segments narration into short readable
+                         lines rather than one paragraph per scene.
+  --noBurnCaptions       Turn burn-in off and rely on the sidecar
+                         captions.srt / captions.vtt instead.
   --renderPlan <path>   Chapter render plan JSON (from seqvio-generate render-plan)
   --chapterDir <path>   Directory for chapter MP4 outputs and render-report.json
   --ir <path>           ExplainerDocument JSON; refreshes hashes/frame ranges
@@ -118,7 +121,7 @@ function parseArgs(argv: string[]): {
     const token = argv[i];
     if (!token.startsWith('--')) continue;
     const key = token.slice(2);
-    if (key === 'keepFrames' || key === 'help' || key === 'burnCaptions' || key === 'staticFrameDedup' || key === 'resume' || key === 'remuxAudio' || key === 'chapters') {
+    if (key === 'keepFrames' || key === 'help' || key === 'burnCaptions' || key === 'noBurnCaptions' || key === 'staticFrameDedup' || key === 'resume' || key === 'remuxAudio' || key === 'chapters') {
       args.set(key, true);
       continue;
     }
@@ -195,7 +198,10 @@ function parseArgs(argv: string[]): {
     audioManifest: typeof audioManifest === 'string' ? path.resolve(audioManifest) : undefined,
     audioTrack:   typeof audioTrack  === 'string' ? path.resolve(audioTrack) : undefined,
     captions:     typeof captions    === 'string' ? path.resolve(captions)   : undefined,
-    burnCaptions: Boolean(args.get('burnCaptions')),
+    // Subtitles are on by default: narration is segmented into short lines at
+    // synthesis, so burn-in no longer means a paragraph across the lower third.
+    // --noBurnCaptions opts out in favour of the sidecar subtitle files.
+    burnCaptions: !args.get('noBurnCaptions'),
     mixMusic:     typeof mixMusic    === 'string' ? path.resolve(mixMusic)   : undefined,
     whiteboardOptimize:
       typeof whiteboardOptimize === 'string'

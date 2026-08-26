@@ -53,7 +53,7 @@ For hand-authored TSX, continue to declare `meta.audio.narration` directly. It
 does not gain semantic Beat alignment unless `meta.audio.explanationBeats` and
 scene timing metadata are also authored.
 
-Do **not** add `--burnCaptions` by default. Voiceover is muxed from the manifest; burned captions are an optional hard-subtitle overlay. Only use `--burnCaptions` for short on-screen lines with bottom safe area — not for full narration paragraphs or YouTube/Bilibili delivery. See [references/audio-workflow.md](references/audio-workflow.md#caption-burn-in-optional).
+Subtitles are **on by default**: `synthesize` splits narration into short cues, and `seqvio-render` burns them in and writes `captions.srt` / `captions.vtt` sidecars. Pass `--noBurnCaptions` when the image must stay clean or when the platform renders uploaded subtitles itself (YouTube, Bilibili), since burnt-in text cannot be toggled or translated. See [references/audio-workflow.md](references/audio-workflow.md#subtitles-on-by-default).
 
 Terminal and Browser capture CLIs follow the same rule: `--withAudio` synthesizes
 and muxes narration, while `--burnCaptions` must be explicit. Every capture job
@@ -194,7 +194,9 @@ Each scene usually wraps its own `WhiteboardScene`. Scene-local draw timings sta
 - **Verdict icons must be applied to every case that earns them.** If one data point gets a `check`, every point on that side of the threshold needs one; a point left bare reads as a different outcome. Re-check the icon set against the claim each time a data point is added.
 - **Always pass `--width` / `--height` matching the composition.** The CLI defaults to 1920x1080 and silently corner-pins a smaller scene.
 - **Never judge or deliver a `--preset preview` render of text.** It is pixelRatio 1 + JPEG; handwriting blurs to illegible. Use `--preset final` for anything a human reads.
-- **Always set `EDGE_TTS_VOICE` — it defaults to `zh-CN-YunxiNeural`.** An unset voice means a Mandarin narrator reads your English script, which sounds subtly wrong rather than obviously broken and survives review. See field-notes item 6.
+- **Always name the narration language: `--lang pt-BR` (or `en-US`, `es-ES`, ...).** Without it `edge-tts` falls back to `zh-CN-YunxiNeural` and a Mandarin narrator reads your script, which sounds subtly wrong rather than obviously broken and survives review.
+- **Localising means re-timing and re-translating the frame, not just the voice.** A translated script has a different length, so rescale scenes against the new cue spans; on-screen labels, thousands separators, and month abbreviations are authored text the audio pipeline never touches.
+- **Subtitles are on by default.** `synthesize` segments narration into short cues and writes `captions.srt` / `captions.vtt`; `seqvio-render` burns them in unless you pass `--noBurnCaptions`. Prefer the sidecars over burn-in when delivering to YouTube or Bilibili, where burnt-in text cannot be toggled or translated.
 - **After synthesis, retime the visuals to the resolved cue spans** before the final render, and probe one frame near each scene's end to catch label/arrow collisions. See field-notes items 5 and 7.
 - For ExplainerDocument audio alignment, use `explanation.cues` and phrase-anchored `explanation.beats`; do not independently tune narration and visual timestamps.
 - For hand-authored TSX, prefer one narration cue per scene or beat and set `sceneId` on each cue.

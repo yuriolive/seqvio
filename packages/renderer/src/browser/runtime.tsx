@@ -422,7 +422,7 @@ function CaptionOverlay({
         position: "absolute",
         left: 64,
         right: 64,
-        bottom: 42,
+        bottom: 28,
         display: "flex",
         justifyContent: "center",
         pointerEvents: "none",
@@ -434,17 +434,21 @@ function CaptionOverlay({
         data-seqvio-caption-id={activeCaption.id}
         data-seqvio-caption-scene={activeCaption.sceneId}
         style={{
-          maxWidth: "85%",
-          padding: "12px 20px",
-          borderRadius: 18,
-          background: "rgba(0, 0, 0, 0.72)",
+          // Sized for a segmented subtitle line, not a paragraph: smaller and
+          // tighter than the old block so it reads as a subtitle and leaves the
+          // drawing above it alone.
+          maxWidth: "78%",
+          padding: "8px 16px",
+          borderRadius: 10,
+          background: "rgba(0, 0, 0, 0.78)",
           color: "#ffffff",
           fontFamily: "system-ui, sans-serif",
-          fontSize: 30,
-          fontWeight: 700,
-          lineHeight: 1.35,
+          fontSize: 22,
+          fontWeight: 600,
+          lineHeight: 1.3,
           textAlign: "center",
-          boxShadow: "0 10px 30px rgba(0, 0, 0, 0.25)",
+          whiteSpace: "pre-line",
+          boxShadow: "0 6px 18px rgba(0, 0, 0, 0.22)",
         }}
       >
         {activeCaption.text}
