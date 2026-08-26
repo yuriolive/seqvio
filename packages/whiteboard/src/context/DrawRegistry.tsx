@@ -24,6 +24,8 @@ import { Point } from '../types';
 
 import { calculateProgress } from '../utils/animationUtils';
 
+import { applyElementTransform } from '../utils/strokePathUtils';
+
 import {
 
   computeEffectiveStartMap,
@@ -334,7 +336,8 @@ export function getPointOnPath(pathElement: SVGPathElement, progress: number): P
 
   const point = pathElement.getPointAtLength(length * Math.max(0, Math.min(1, progress)));
 
-  return { x: point.x, y: point.y };
+  // Local path space is not scene space for transformed drawables (DrawIcon).
+  return applyElementTransform(pathElement, point);
 
 }
 
@@ -348,9 +351,12 @@ export function getAngleOnPath(pathElement: SVGPathElement, progress: number): n
 
   const delta = Math.max(1, length * 0.01);
 
-  const p1 = pathElement.getPointAtLength(length * t);
+  const p1 = applyElementTransform(pathElement, pathElement.getPointAtLength(length * t));
 
-  const p2 = pathElement.getPointAtLength(Math.min(length, length * t + delta));
+  const p2 = applyElementTransform(
+    pathElement,
+    pathElement.getPointAtLength(Math.min(length, length * t + delta))
+  );
 
   return (Math.atan2(p2.y - p1.y, p2.x - p1.x) * 180) / Math.PI;
 

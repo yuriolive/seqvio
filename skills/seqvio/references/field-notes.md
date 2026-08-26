@@ -271,6 +271,42 @@ outline has more than a handful of jumps is a geometry bug upstream.
 frame as a draw change, and snaps straight to the true angle rather than lerping
 up from zero. Preserve that branch if you refactor the smoothing.
 
+### Pen parked in a corner means a coordinate-space mismatch
+
+If the pencil sits near the top-left of the frame while something is visibly
+being drawn elsewhere, the pen is reading local path coordinates as scene
+coordinates.
+
+`getPointAtLength` reports a point in the path's **own** user space and knows
+nothing about transforms on its ancestors. Most drawables author geometry
+directly in scene pixels, so the two spaces coincide and nobody notices.
+`DrawIcon` does not: its geometry lives in a 24x24 icon viewBox placed by
+`translate(x, y) scale(size/24)` on a wrapping `<g>`, so a point on a check mark
+comes back as something like `(6, 12)` and the pen goes to the top-left corner.
+
+Fixed by mapping every sampled point through `pathElement.getCTM()` in
+`applyElementTransform` (`strokePathUtils.ts`), used by `getStrokeHeadOnPath`
+and by `getPointOnPath` / `getAngleOnPath` in `DrawRegistry`. The matrix is the
+identity for untransformed drawables, so this is safe everywhere.
+
+**The rule for new drawables:** any element that registers with the draw
+registry while rendering inside a transformed `<g>` must report scene-space
+coordinates. Do not hand raw `getPointAtLength` output to the registry.
+
+**How to check it:** find a frame where an icon (or any transformed element) is
+mid-draw and look at the pencil. Icon draws are short and single-pen scheduling
+shifts their effective start later than the authored `start`, so scan a range
+rather than trusting the authored number:
+
+```bash
+node packages/renderer/dist/cli.js --component <c> --output output/scan.mp4 \
+  --width 1280 --height 720 --startFrame <sceneStart+iconStart> \
+  --endFrame <that+120> --preset preview --audioManifest <resolved.json>
+ffmpeg -y -i output/scan.mp4 -vf "select=eq(n\,30)" -vframes 1 output/scan.png
+```
+
+A pen in the corner during any part of that window is this bug.
+
 ### Default to a pen that does not turn
 
 Even with correct tangents, a pen that faces the stroke direction reads as

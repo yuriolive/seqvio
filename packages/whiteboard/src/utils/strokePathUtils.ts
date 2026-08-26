@@ -14,6 +14,34 @@ export function resolvePathLength(
 }
 
 /**
+ * Map a point from a path's own coordinate system into the scene.
+ *
+ * `getPointAtLength` reports coordinates in the path's local user space, which
+ * ignores every transform on its ancestors. Most drawables author their geometry
+ * directly in scene pixels, so local space and scene space coincide and this is
+ * the identity. `DrawIcon` does not: its geometry lives in a 24x24 icon viewBox
+ * and is placed with `translate(...) scale(...)` on a wrapping <g>. Consuming
+ * its raw local points put the following pen near the scene origin instead of on
+ * the icon.
+ *
+ * Applying the element's own CTM covers both cases and any future transformed
+ * drawable. The matrix is applied by hand rather than via DOMPoint so this stays
+ * usable outside a full browser environment.
+ */
+export function applyElementTransform(
+  pathElement: SVGPathElement,
+  point: { x: number; y: number }
+): Point {
+  const m =
+    typeof pathElement.getCTM === 'function' ? pathElement.getCTM() : null;
+  if (!m) return { x: point.x, y: point.y };
+  return {
+    x: m.a * point.x + m.c * point.y + m.e,
+    y: m.b * point.x + m.d * point.y + m.f,
+  };
+}
+
+/**
  * Point and tangent angle at the visible stroke head for dashoffset animation.
  * Offsets slightly along the tangent so the nib meets the round line cap.
  */
@@ -58,7 +86,10 @@ export function getStrokeHeadOnPath(
 
   const t = Math.max(0, Math.min(1, progress));
   const headDist = Math.min(length, t * length);
-  const point = pathElement.getPointAtLength(headDist);
+  const point = applyElementTransform(
+    pathElement,
+    pathElement.getPointAtLength(headDist)
+  );
 
   const delta = Math.max(0.5, length * 0.008);
   const maxStep = delta * JUMP_STEP_RATIO;
@@ -67,14 +98,20 @@ export function getStrokeHeadOnPath(
     pathElement.getPointAtLength(Math.max(0, Math.min(length, d)));
 
   // One sampling step, or null when it crosses a sub-path gap (or is degenerate).
+  // Gap detection runs on local distances, which share units with `delta`; the
+  // direction is taken in scene space so a scaled element reports a scene angle.
   const step = (from: number, to: number): { dx: number; dy: number } | null => {
     if (to <= 0 || from >= length || Math.abs(to - from) < 1e-6) return null;
-    const a = at(from);
-    const b = at(to);
+    const localA = at(from);
+    const localB = at(to);
+    const localDist = Math.hypot(localB.x - localA.x, localB.y - localA.y);
+    if (localDist < 1e-6 || localDist > maxStep) return null;
+    const a = applyElementTransform(pathElement, localA);
+    const b = applyElementTransform(pathElement, localB);
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const d = Math.hypot(dx, dy);
-    if (d < 1e-6 || d > maxStep) return null;
+    if (d < 1e-6) return null;
     return { dx: dx / d, dy: dy / d };
   };
 
