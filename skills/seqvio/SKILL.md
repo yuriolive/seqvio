@@ -113,6 +113,13 @@ The skill alone does not install npm packages or render MP4 output.
 
 ## Read This First
 
+**Mandatory before authoring any composition — not optional, not "if time permits":**
+
+1. Read [references/field-notes.md](references/field-notes.md). It contains the failure modes that actually happen on a first run (broken npm install, unreadable output, text-only visuals, narration/visual length mismatch). Skipping it reproduces them.
+2. Read the "Diagram richness", "Scene-level visual metaphors", and "Expressive blackboard motion" sections of [references/production-techniques.md](references/production-techniques.md) **before** writing the first `DrawText`. A composition authored without them defaults to centered text lines, which is the single most common bad output this framework produces.
+
+Then, as needed:
+
 - For overall scope and repo layout, read [references/current-capabilities.md](references/current-capabilities.md).
 - For file contracts and code patterns, read [references/authoring-patterns.md](references/authoring-patterns.md).
 - For build and render commands, read [references/render-workflow.md](references/render-workflow.md).
@@ -175,6 +182,11 @@ Each scene usually wraps its own `WhiteboardScene`. Scene-local draw timings sta
   - a default React component
   - `meta` with at least `duration` and `fps`
 - All timing is in **frames**, not seconds.
+- **A composition of centered text lines is a defect, not a style.** Every scene needs a diagram form — axis and data marks, a fan-out, a threshold plot, a converging junction — with text as labels on it. See [references/field-notes.md](references/field-notes.md) item 8 for the forms that are buildable from the seven available shape types, and item 9 for the self-check. Never reuse the same layout across two scenes.
+- **Never place `DrawText` inside a themed `DrawShape`.** Under `excalidrawTheme` the shape gets a dense hachure fill even with `fillColor="none"` and the text becomes unreadable. Label outside the shape edge, or color the text itself.
+- **Always pass `--width` / `--height` matching the composition.** The CLI defaults to 1920x1080 and silently corner-pins a smaller scene.
+- **Never judge or deliver a `--preset preview` render of text.** It is pixelRatio 1 + JPEG; handwriting blurs to illegible. Use `--preset final` for anything a human reads.
+- **After synthesis, retime the visuals to the resolved cue spans** before the final render, and probe one frame near each scene's end to catch label/arrow collisions. See field-notes items 5 and 7.
 - For ExplainerDocument audio alignment, use `explanation.cues` and phrase-anchored `explanation.beats`; do not independently tune narration and visual timestamps.
 - For hand-authored TSX, prefer one narration cue per scene or beat and set `sceneId` on each cue.
 - For narrated videos, **voice is the clock**: do not pad scenes with silence to hit a target duration. If the video must be longer, expand the script and synthesize more narration.
