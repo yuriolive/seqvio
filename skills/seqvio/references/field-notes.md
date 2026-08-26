@@ -248,3 +248,22 @@ outline has more than a handful of jumps is a geometry bug upstream.
 `--workers N` only because a fresh worker sees `drawId === null`, treats the
 frame as a draw change, and snaps straight to the true angle rather than lerping
 up from zero. Preserve that branch if you refactor the smoothing.
+
+### Default to a pen that does not turn
+
+Even with correct tangents, a pen that faces the stroke direction reads as
+restless: shape outlines change direction at every corner and every sub-stroke,
+so the pencil pivots constantly and the eye follows the pen instead of the
+drawing. Commercial hand-drawn explainer styles keep the pen at one fixed angle
+and only slide it along the stroke.
+
+Prefer that, in every scene:
+
+```tsx
+<Hand action="write" follow visible rotate={false} rotation={-32} />
+```
+
+`rotate={false}` holds the angle given by `rotation` (negative tilts the pencil
+so it enters from the lower right, like a right-handed hand). Turn rotation back
+on only for a scene that is one long continuous curve, where facing the stroke
+genuinely helps.

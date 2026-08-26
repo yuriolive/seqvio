@@ -70,6 +70,15 @@ export interface HandProps {
   follow?: boolean;
   visible?: boolean;
   rotation?: number;
+  /**
+   * Whether the pen turns to face the stroke direction. Default `true`.
+   *
+   * Set `false` for the steadier look used by most hand-drawn explainer video
+   * styles: the pen keeps the fixed angle given by `rotation` and only travels
+   * along the stroke head. Turning is what makes the pen read as restless on
+   * shapes, whose outlines change direction at every corner and sub-stroke.
+   */
+  rotate?: boolean;
   /** Override theme pen tip size in CSS pixels. */
   size?: number;
 }

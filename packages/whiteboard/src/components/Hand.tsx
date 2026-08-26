@@ -28,6 +28,7 @@ export const Hand: React.FC<HandProps> = ({
   follow = true,
   visible = true,
   rotation = 0,
+  rotate = true,
   size: sizeProp,
 }) => {
   const theme = useWhiteboardTheme();
@@ -100,7 +101,10 @@ export const Hand: React.FC<HandProps> = ({
       if (hasActiveDraw) {
         const drawChanged = penState.current.drawId !== activeDraw.id;
         penState.current.drawId = activeDraw.id;
-        if (drawChanged) {
+        if (!rotate) {
+          // Fixed-angle pen: travel along the stroke, never turn.
+          penRot = rotation;
+        } else if (drawChanged) {
           penRot = targetRot;
         } else {
           penRot = lerpAngleDegrees(
